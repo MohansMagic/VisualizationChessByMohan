@@ -10,7 +10,7 @@ type Piece = '' | 'wK' | 'wQ' | 'wR' | 'wB' | 'wN' | 'wP' | 'bK' | 'bQ' | 'bR' |
   standalone: true,
   imports: [NgClass, NgIf, NgForOf, FormsModule],
   templateUrl: './app.html',
-  styleUrls: ['./app.scss']
+  styleUrls: ['./app.scss'] // or './app.css' if you use CSS
 })
 export class App {
   chess = new Chess();
@@ -18,6 +18,9 @@ export class App {
   blindfold = false;
   moveError = '';
   selectedSquare: string | null = null;
+
+  files = ['a','b','c','d','e','f','g','h'];
+  ranks = [8,7,6,5,4,3,2,1];
 
   get board(): Piece[][] {
     const raw = this.chess.board();

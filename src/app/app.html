@@ -1,25 +1,40 @@
-<div style="margin-bottom: 16px;">
+<!-- File labels (a-h) above the board -->
+<div class="board-labels files">
+  <span *ngFor="let file of files">{{ file }}</span>
+</div>
+
+<div class="chessboard-with-ranks">
+  <div class="board-rows">
+    <div *ngFor="let row of board; let i = index" class="board-row-with-rank">
+      <span class="rank-label">{{ 8 - i }}</span>
+      <div class="board-row">
+        <div
+          *ngFor="let piece of row; let j = index"
+          class="square"
+          [ngClass]="[
+            (i + j) % 2 === 0 ? 'beige' : 'brown',
+            selectedSquare === getSquareName(i, j) ? 'selected' : ''
+          ]"
+          (click)="onSquareClick(i, j)">
+          <img *ngIf="piece && !blindfold" [src]="getPieceUrl(piece)" width="32" height="32" />
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- File labels (a-h) below the board -->
+<div class="board-labels files">
+  <span *ngFor="let file of files">{{ file }}</span>
+</div>
+
+<div style="margin: 16px 0;">
   <button (click)="blindfold = !blindfold">
     {{ blindfold ? 'Show Pieces' : 'Blindfold Mode' }}
   </button>
   <button (click)="reset()" style="margin-left: 8px;">
     Reset
   </button>
-</div>
-
-<div class="chessboard">
-  <div *ngFor="let row of board; let i = index" class="board-row">
-    <div
-      *ngFor="let piece of row; let j = index"
-      class="square"
-      [ngClass]="[
-        (i + j) % 2 === 0 ? 'beige' : 'brown',
-        selectedSquare === getSquareName(i, j) ? 'selected' : ''
-      ]"
-      (click)="onSquareClick(i, j)">
-      <img *ngIf="piece && !blindfold" [src]="getPieceUrl(piece)" width="32" height="32" />
-    </div>
-  </div>
 </div>
 
 <div style="margin-top: 16px;">

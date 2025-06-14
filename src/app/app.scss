@@ -1,31 +1,68 @@
-.chessboard {
-    width: 320px;
-    height: 320px;
-    display: flex;
-    flex-direction: column;
-    border: 2px solid #333;
-  }
-  
-  .board-row {
-    display: flex;
-  }
-  
-  .square {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    padding: 0;
-    margin: 0;
-  }
-  
-  .beige {
-    background-color: #f0d9b5;
-  }
-  
-  .brown {
-    background-color: #b58863;
-  }
-  
+.chessboard-with-ranks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.board-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.board-row-with-rank {
+  display: flex;
+  align-items: center;
+}
+
+.rank-label {
+  width: 20px;
+  text-align: right;
+  margin-right: 4px;
+  font-weight: bold;
+  font-family: monospace;
+  color: #555;
+  user-select: none;
+}
+
+.board-row {
+  display: flex;
+}
+
+.square {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.beige {
+  background: #f0d9b5;
+}
+
+.brown {
+  background: #b58863;
+}
+
+.selected {
+  outline: 2px solid #33f;
+  z-index: 1;
+}
+
+.board-labels.files {
+  display: flex;
+  justify-content: flex-start;
+  margin-left: 24px; /* aligns with ranks */
+  margin-bottom: 2px;
+  margin-top: 2px;
+}
+
+.board-labels.files span {
+  width: 40px;
+  text-align: center;
+  font-family: monospace;
+  color: #555;
+  user-select: none;
+}
