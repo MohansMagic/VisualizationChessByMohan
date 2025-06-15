@@ -1,59 +1,71 @@
-<!-- File labels (a-h) above the board -->
-<div class="board-labels files">
-  <span *ngFor="let file of files">{{ file }}</span>
-</div>
-
-<div class="chessboard-with-ranks">
-  <div class="board-rows">
-    <div *ngFor="let row of board; let i = index" class="board-row-with-rank">
-      <span class="rank-label">{{ 8 - i }}</span>
-      <div class="board-row">
-        <div
-          *ngFor="let piece of row; let j = index"
-          class="square"
-          [ngClass]="[
-            (i + j) % 2 === 0 ? 'beige' : 'brown',
-            selectedSquare === getSquareName(i, j) ? 'selected' : ''
-          ]"
-          (click)="onSquareClick(i, j)">
-          <img *ngIf="piece && !blindfold" [src]="getPieceUrl(piece)" width="32" height="32" />
+<div class="app-root">
+  <div class="background-overlay"></div>
+  <div class="main-content">
+    <div class="chessboard-with-ranks">
+      <div class="board-rows">
+        <!-- Top file labels -->
+        <div class="board-labels-edge board-labels-edge-top">
+          <span class="edge-label" *ngFor="let j of files">{{ j }}</span>
+        </div>
+        <!-- Board rows with rank labels on left and right -->
+        <div *ngFor="let row of board; let i = index" class="board-row-with-edge-labels">
+          <span class="edge-label">{{ 8 - i }}</span>
+          <div class="board-row">
+            <div
+              *ngFor="let piece of row; let j = index"
+              class="square"
+              [ngClass]="[
+                (i + j) % 2 === 0 ? 'beige' : 'brown',
+                selectedSquare === getSquareName(i, j) ? 'selected' : ''
+              ]"
+              (click)="onSquareClick(i, j)">
+              <img *ngIf="piece && !blindfold" [src]="getPieceUrl(piece)" width="32" height="32" />
+            </div>
+          </div>
+          <span class="edge-label">{{ 8 - i }}</span>
+        </div>
+        <!-- Bottom file labels -->
+        <div class="board-labels-edge board-labels-edge-bottom">
+          <span class="edge-label" *ngFor="let j of files">{{ j }}</span>
         </div>
       </div>
     </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button (click)="blindfold = !blindfold">
+        {{ blindfold ? 'Show Pieces' : 'Blindfold Mode' }}
+      </button>
+      <button (click)="reset()">
+        Reset
+      </button>
+      <button (click)="startListening()">
+        🎤 Speak Move
+      </button>
+      <span *ngIf="isListening" class="listening-indicator">Listening...</span>
+    </div>
+
+    <div class="move-input-row">
+      <input [(ngModel)]="moveInput" placeholder="e4, Nf3, exd5, e2e4, ..." />
+      <button (click)="movePiece(moveInput)">Move</button>
+      <span class="move-error" *ngIf="moveError">{{ moveError }}</span>
+    </div>
+
+    <div class="info-section">
+      <div>
+        <strong>FEN:</strong>
+        <div class="info-mono">{{ fen }}</div>
+      </div>
+      <div>
+        <strong>PGN:</strong>
+        <div class="info-mono">{{ pgn }}</div>
+      </div>
+      <div>
+        <strong>Move History:</strong>
+        <ol>
+          <li *ngFor="let move of moveHistory">{{ move }}</li>
+        </ol>
+      </div>
+    </div>
   </div>
-</div>
-
-<!-- File labels (a-h) below the board -->
-<div class="board-labels files">
-  <span *ngFor="let file of files">{{ file }}</span>
-</div>
-
-<div style="margin: 16px 0;">
-  <button (click)="blindfold = !blindfold">
-    {{ blindfold ? 'Show Pieces' : 'Blindfold Mode' }}
-  </button>
-  <button (click)="reset()" style="margin-left: 8px;">
-    Reset
-  </button>
-</div>
-
-<div style="margin-top: 16px;">
-  <input [(ngModel)]="moveInput" placeholder="e4, Nf3, exd5, e2e4, ..." />
-  <button (click)="movePiece(moveInput)">Move</button>
-  <span style="color: red; margin-left: 12px;" *ngIf="moveError">{{ moveError }}</span>
-</div>
-
-<div style="margin-top: 16px;">
-  <strong>FEN:</strong>
-  <div style="font-family:monospace; word-break:break-all;">{{ fen }}</div>
-</div>
-<div style="margin-top: 8px;">
-  <strong>PGN:</strong>
-  <div style="font-family:monospace; white-space:pre-line;">{{ pgn }}</div>
-</div>
-<div style="margin-top: 8px;">
-  <strong>Move History:</strong>
-  <ol>
-    <li *ngFor="let move of moveHistory">{{ move }}</li>
-  </ol>
 </div>

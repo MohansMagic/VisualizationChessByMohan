@@ -10,7 +10,7 @@ type Piece = '' | 'wK' | 'wQ' | 'wR' | 'wB' | 'wN' | 'wP' | 'bK' | 'bQ' | 'bR' |
   standalone: true,
   imports: [NgClass, NgIf, NgForOf, FormsModule],
   templateUrl: './app.html',
-  styleUrls: ['./app.scss'] // or './app.css' if you use CSS
+  styleUrls: ['./app.scss']
 })
 export class App {
   chess = new Chess();
@@ -21,6 +21,9 @@ export class App {
 
   files = ['a','b','c','d','e','f','g','h'];
   ranks = [8,7,6,5,4,3,2,1];
+
+  isListening = false;
+  recognition: any = null;
 
   get board(): Piece[][] {
     const raw = this.chess.board();
@@ -143,5 +146,43 @@ export class App {
     this.moveError = '';
     this.moveInput = '';
     this.selectedSquare = null;
+  }
+
+  // --- Voice Recognition Methods ---
+  startListening() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      this.moveError = 'Speech recognition not supported in this browser.';
+      return;
+    }
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.lang = 'en-US';
+    this.recognition.interimResults = false;
+    this.recognition.maxAlternatives = 1;
+
+    this.isListening = true;
+    this.recognition.start();
+
+    this.recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript.trim();
+      this.isListening = false;
+      this.handleVoiceMove(transcript);
+    };
+
+    this.recognition.onerror = (event: any) => {
+      this.isListening = false;
+      this.moveError = 'Voice recognition error: ' + event.error;
+    };
+
+    this.recognition.onend = () => {
+      this.isListening = false;
+    };
+  }
+
+  handleVoiceMove(transcript: string) {
+    let move = transcript.replace(/\s+/g, '').toLowerCase();
+    this.moveInput = move;
+    this.movePiece(move);
   }
 }
