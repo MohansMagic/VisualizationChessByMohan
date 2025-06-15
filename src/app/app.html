@@ -1,6 +1,23 @@
 <div class="app-root">
   <div class="background-overlay"></div>
   <div class="main-content">
+
+    <!-- User names and timers -->
+    <div class="timers-row">
+      <div class="timer-block white-block" [class.active]="activeColor === 'w'">
+        <input class="name-input" [(ngModel)]="whiteName" />
+        <div class="timer" [class.timeup]="timeUp==='w'">
+          {{ timeUp === 'w' ? "Time's up!" : formatTime(whiteTime) }}
+        </div>
+      </div>
+      <div class="timer-block black-block" [class.active]="activeColor === 'b'">
+        <input class="name-input" [(ngModel)]="blackName" />
+        <div class="timer" [class.timeup]="timeUp==='b'">
+          {{ timeUp === 'b' ? "Time's up!" : formatTime(blackTime) }}
+        </div>
+      </div>
+    </div>
+
     <div class="chessboard-with-ranks">
       <div class="board-rows">
         <!-- Top file labels -->

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { NgClass, NgIf, NgForOf } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chess, Move, Square } from 'chess.js';
@@ -12,7 +12,7 @@ type Piece = '' | 'wK' | 'wQ' | 'wR' | 'wB' | 'wN' | 'wP' | 'bK' | 'bQ' | 'bR' |
   templateUrl: './app.html',
   styleUrls: ['./app.scss']
 })
-export class App {
+export class App implements OnInit, OnDestroy {
   chess = new Chess();
   moveInput = '';
   blindfold = false;
@@ -22,8 +22,26 @@ export class App {
   files = ['a','b','c','d','e','f','g','h'];
   ranks = [8,7,6,5,4,3,2,1];
 
+  // Usernames and timers
+  whiteName = 'White';
+  blackName = 'Black';
+  whiteTime = 5 * 60; // seconds
+  blackTime = 5 * 60; // seconds
+  activeColor: 'w' | 'b' = 'w';
+  timerInterval: any = null;
+  timeUp: '' | 'w' | 'b' = '';
+
   isListening = false;
   recognition: any = null;
+
+  ngOnInit() {
+    this.startTimer();
+  }
+
+  ngOnDestroy() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    if (this.recognition) this.recognition.abort();
+  }
 
   get board(): Piece[][] {
     const raw = this.chess.board();
@@ -65,6 +83,7 @@ export class App {
   }
 
   onSquareClick(row: number, col: number) {
+    if (this.timeUp) return;
     const square = this.getSquareName(row, col);
 
     if (!this.selectedSquare) {
@@ -108,6 +127,7 @@ export class App {
 
     if (moveResult) {
       this.moveError = '';
+      this.switchTimer();
     } else {
       this.moveError = 'Invalid move!';
     }
@@ -115,6 +135,7 @@ export class App {
   }
 
   movePiece(move: string) {
+    if (this.timeUp) return;
     this.moveError = '';
     move = move.trim();
     if (!move) return;
@@ -124,6 +145,8 @@ export class App {
     }
     if (!result) {
       this.moveError = 'Invalid move! Use e4, Nf3, exd5, or e2e4.';
+    } else {
+      this.switchTimer();
     }
     this.moveInput = '';
     this.selectedSquare = null;
@@ -146,10 +169,46 @@ export class App {
     this.moveError = '';
     this.moveInput = '';
     this.selectedSquare = null;
+    this.whiteTime = 5 * 60;
+    this.blackTime = 5 * 60;
+    this.activeColor = 'w';
+    this.timeUp = '';
+    this.startTimer();
+  }
+
+  // --- Timer Logic ---
+  startTimer() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.timerInterval = setInterval(() => {
+      if (this.timeUp) return;
+      if (this.activeColor === 'w') {
+        if (this.whiteTime > 0) {
+          this.whiteTime--;
+          if (this.whiteTime === 0) this.timeUp = 'w';
+        }
+      } else {
+        if (this.blackTime > 0) {
+          this.blackTime--;
+          if (this.blackTime === 0) this.timeUp = 'b';
+        }
+      }
+    }, 1000);
+  }
+
+  switchTimer() {
+    this.activeColor = this.chess.turn();
+    this.startTimer();
+  }
+
+  formatTime(seconds: number): string {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
   }
 
   // --- Voice Recognition Methods ---
   startListening() {
+    if (this.timeUp) return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       this.moveError = 'Speech recognition not supported in this browser.';
