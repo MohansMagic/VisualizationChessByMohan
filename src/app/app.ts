@@ -47,7 +47,6 @@ export class App implements OnInit, OnDestroy {
   captureAudio: HTMLAudioElement;
   soundReady = false;
 
-  
   constructor() {
     this.moveAudio = new Audio('https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_move.wav');
     this.captureAudio = new Audio('https://upload.wikimedia.org/wikipedia/commons/8/88/Chess_capture.wav');
@@ -378,16 +377,34 @@ export class App implements OnInit, OnDestroy {
     if (this.timeUp) return;
     this.ensureSoundReady();
     this.moveError = '';
-    move = move.trim();
+    move = move.trim().toLowerCase();
     if (!move) return;
 
     let result = this.chess.move(move);
 
-    if (!result && /^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(move)) {
+    // Try coordinate notation with promotion (e.g., e7e8q)
+    if (!result && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
       const from = move.slice(0,2);
       const to = move.slice(2,4);
-      const promotion = move.length === 5 ? move[4].toLowerCase() : undefined;
-      result = this.chess.move({ from: from as Square, to: to as Square, promotion });
+      const promotion = move.length === 5 ? move[4] : undefined;
+      result = this.chess.move({ from, to, promotion });
+    }
+
+    // NEW: Try parsing "e7 to e8 queen" or "e7 e8 knight"
+    if (!result) {
+      const promotionMatch = move.match(/([a-h][1-8])\s*(to)?\s*([a-h][1-8])\s*(queen|rook|bishop|knight)?/);
+      if (promotionMatch) {
+        const from = promotionMatch[1];
+        const to = promotionMatch[3];
+        let promotion;
+        switch (promotionMatch[4]) {
+          case 'queen': promotion = 'q'; break;
+          case 'rook': promotion = 'r'; break;
+          case 'bishop': promotion = 'b'; break;
+          case 'knight': promotion = 'n'; break;
+        }
+        result = this.chess.move({ from, to, promotion });
+      }
     }
 
     if (!result) {
@@ -496,110 +513,44 @@ export class App implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.isListening) {
+      if (this.recognition) {
+        this.recognition.abort();
+        this.isListening = false;
+      }
+      return;
+    }
+
     this.recognition = new SpeechRecognition();
     this.recognition.lang = 'en-US';
+    this.recognition.continuous = false;
     this.recognition.interimResults = false;
     this.recognition.maxAlternatives = 1;
 
-    this.isListening = true;
-    this.recognition.start();
-
-    this.recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript.trim();
-      this.isListening = false;
-      this.handleVoiceMove(transcript);
-    };
-
-    this.recognition.onerror = (event: any) => {
-      this.isListening = false;
-      this.moveError = 'Voice recognition error: ' + event.error;
-      if (this.voiceEnabled) {
-        this.speak('Voice recognition error. Please try again.');
-      }
+    this.recognition.onstart = () => {
+      this.isListening = true;
+      this.moveError = '';
     };
 
     this.recognition.onend = () => {
       this.isListening = false;
     };
-  }
 
-  handleVoiceMove(transcript: string) {
-    console.log('Voice command:', transcript);
-    
-    // Check for special commands
-    if (transcript.toLowerCase().includes('repeat')) {
-      this.repeatLastMessage();
-      return;
-    }
-    
-    if (transcript.toLowerCase().includes('board') || transcript.toLowerCase().includes('position')) {
-      this.announceBoard();
-      return;
-    }
-    
-    if (transcript.toLowerCase().includes('help')) {
-      this.speak('Say moves like "e2 to e4", "knight f3", "bishop takes e5", or "castle kingside". You can also say "repeat" to hear the last message again, or "board" to hear the current position.');
-      return;
-    }
-
-    // Lowercase, remove punctuation, collapse spaces
-    let move = transcript
-      .toLowerCase()
-      .replace(/[.,!?]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    // Map spoken piece names to letters
-    const pieceMap: Record<string, string> = {
-      'pawn': '',
-      'knight': 'N',
-      'night': 'N', // for misrecognition
-      'bishop': 'B',
-      'rook': 'R',
-      'queen': 'Q',
-      'king': 'K'
+    this.recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript.trim().toLowerCase();
+      this.recognizedVoiceMove = transcript;
+      this.moveInput = transcript;
+      this.movePiece(transcript);
     };
 
-    // Replace "takes", "capture", "captures", "x" with "x"
-    move = move.replace(/\btakes\b|\bcaptures?\b|\bx\b/g, 'x');
-
-    // Handle castling
-    if (move.includes('castle')) {
-      if (move.includes('kingside') || move.includes('king side')) {
-        move = 'O-O';
-      } else if (move.includes('queenside') || move.includes('queen side')) {
-        move = 'O-O-O';
+    this.recognition.onerror = (event: any) => {
+      this.isListening = false;
+      this.moveError = `Speech recognition error: ${event.error}`;
+      if (this.voiceEnabled) {
+        this.speak(`Speech recognition error: ${event.error}. Please try again.`);
       }
-    }
+    };
 
-    // Handle commands like "queen x d4", "bishop takes e5"
-    for (const [word, letter] of Object.entries(pieceMap)) {
-      // Capture: "queen x d4"
-      move = move.replace(new RegExp(`^${word} x ([a-h][1-8])$`), `${letter}x$1`);
-      // Move: "queen d4"
-      move = move.replace(new RegExp(`^${word} ([a-h][1-8])$`), `${letter}$1`);
-      // Move: "queen to d4"
-      move = move.replace(new RegExp(`^${word} to ([a-h][1-8])$`), `${letter}$1`);
-      // Capture: "queen captures d4"
-      move = move.replace(new RegExp(`^${word} captures? ([a-h][1-8])$`), `${letter}x$1`);
-    }
-
-    // Handle pawn captures: "pawn x d4" → "xd4"
-    move = move.replace(/^pawn x ([a-h][1-8])$/, 'x$1');
-
-    // Remove "to" in "e2 to e4"
-    move = move.replace(/^([a-h][1-8]) to ([a-h][1-8])$/, '$1$2');
-
-    // Remove extra spaces
-    move = move.replace(/\s+/g, '');
-
-    // Capitalize piece letter if present
-    if (/^[nbrqk][a-h][1-8]$/i.test(move) || /^[nbrqk]x[a-h][1-8]$/i.test(move)) {
-      move = move.charAt(0).toUpperCase() + move.slice(1);
-    }
-
-    this.recognizedVoiceMove = move;
-    this.moveInput = move;
-    this.movePiece(move);
+    this.recognition.start();
   }
 }
