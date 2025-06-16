@@ -1,7 +1,7 @@
 <div class="app-root">
   <div class="background-overlay"></div>
   <div class="main-content">
-
+    
     <!-- User names and timers -->
     <div class="timers-row">
       <div class="timer-block white-block" [class.active]="activeColor === 'w'">
@@ -18,13 +18,35 @@
       </div>
     </div>
 
+    <!-- Enhanced Voice Controls -->
+    <div class="voice-controls-section">
+      <div class="voice-main-controls">
+        <button class="voice-toggle-btn" [class.active]="voiceEnabled" (click)="toggleVoiceMode()">
+          <span class="voice-icon">🔊</span>
+          Voice {{ voiceEnabled ? 'ON' : 'OFF' }}
+        </button>
+        
+        <button class="repeat-btn" [disabled]="!voiceEnabled" (click)="repeatLastMessage()">
+          <span class="repeat-icon">🔄</span>
+          Repeat
+        </button>
+        
+        <button class="announce-board-btn" (click)="announceBoard()">
+          <span class="announce-icon">📢</span>
+          Announce Board
+        </button>
+      </div>
+      
+      <div class="voice-feedback" *ngIf="lastSpokenText && voiceEnabled">
+        <span class="last-message">🎙️ Last: "{{ lastSpokenText }}"</span>
+      </div>
+    </div>
+
     <div class="chessboard-with-ranks">
       <div class="board-rows">
-        <!-- Top file labels -->
         <div class="board-labels-edge board-labels-edge-top">
           <span class="edge-label" *ngFor="let j of files">{{ j }}</span>
         </div>
-        <!-- Board rows with rank labels on left and right -->
         <div *ngFor="let row of board; let i = index" class="board-row-with-edge-labels">
           <span class="edge-label">{{ 8 - i }}</span>
           <div class="board-row">
@@ -35,54 +57,65 @@
                 (i + j) % 2 === 0 ? 'beige' : 'brown',
                 selectedSquare === getSquareName(i, j) ? 'selected' : ''
               ]"
-              (click)="onSquareClick(i, j)">
-              <img *ngIf="piece && !blindfold" [src]="getPieceUrl(piece)" width="32" height="32" />
+              (click)="onSquareClick(i, j)"
+              (touchstart)="onTouchStart(i, j, $event)"
+              (touchend)="onTouchEnd(i, j, $event)"
+            >
+              <img *ngIf="piece && !blindfold" [src]="getPieceUrl(piece)" />
+              <div class="square-coord" *ngIf="blindfold">{{ getSquareName(i, j) }}</div>
             </div>
           </div>
           <span class="edge-label">{{ 8 - i }}</span>
         </div>
-        <!-- Bottom file labels -->
         <div class="board-labels-edge board-labels-edge-bottom">
           <span class="edge-label" *ngFor="let j of files">{{ j }}</span>
         </div>
       </div>
     </div>
 
-    <!-- Controls -->
-    <div class="controls">
-      <button (click)="blindfold = !blindfold">
-        {{ blindfold ? 'Show Pieces' : 'Blindfold Mode' }}
-      </button>
-      <button (click)="reset()">
-        Reset
-      </button>
-      <button (click)="startListening()">
-        🎤 Speak Move
-      </button>
-      <span *ngIf="isListening" class="listening-indicator">Listening...</span>
+    <!-- Controls Row -->
+    <div class="controls-row">
+      <div class="controls controls-left">
+        <button (click)="blindfold = !blindfold">
+          {{ blindfold ? 'Show Pieces' : 'Blindfold Mode' }}
+        </button>
+        <button (click)="reset()">
+          Reset
+        </button>
+      </div>
+      <div class="controls controls-right">
+        <button class="speak-move-btn" (click)="startListening()">
+          🎤 Speak Move
+        </button>
+        <span *ngIf="isListening" class="listening-indicator">Listening...</span>
+        <input [(ngModel)]="moveInput" placeholder="e4, Nf3, exd5, e2e4, ..." />
+        <button (click)="movePiece(moveInput)">Move</button>
+      </div>
+    </div>
+    
+    <!-- Enhanced Voice Feedback -->
+    <div *ngIf="recognizedVoiceMove" class="voice-feedback">
+      <span>🎤 Recognized: <b>{{ recognizedVoiceMove }}</b></span>
+      <span *ngIf="moveError" class="move-error"> - {{ moveError }}</span>
+      <span *ngIf="!moveError" class="move-success"> - Move played!</span>
     </div>
 
-    <div class="move-input-row">
-      <input [(ngModel)]="moveInput" placeholder="e4, Nf3, exd5, e2e4, ..." />
-      <button (click)="movePiece(moveInput)">Move</button>
-      <span class="move-error" *ngIf="moveError">{{ moveError }}</span>
-    </div>
-
-    <div class="info-section">
-      <div>
-        <strong>FEN:</strong>
-        <div class="info-mono">{{ fen }}</div>
-      </div>
-      <div>
-        <strong>PGN:</strong>
-        <div class="info-mono">{{ pgn }}</div>
-      </div>
-      <div>
-        <strong>Move History:</strong>
-        <ol>
-          <li *ngFor="let move of moveHistory">{{ move }}</li>
-        </ol>
-      </div>
-    </div>
-  </div>
-</div>
+    <!-- Voice Commands Help -->
+    <div class="voice-help-section" *ngIf="voiceEnabled">
+      <h3>🎙️ Voice Commands</h3>
+      <div class="command-grid">
+        <div class="command-item">
+          <strong>"e2 to e4"</strong>
+          <span>Move piece</span>
+        </div>
+        <div class="command-item">
+          <strong>"knight f3"</strong>
+          <span>Piece move</span>
+        </div>
+        <div class="command-item">
+          <strong>"bishop takes e5"</strong>
+          <span>Capture</span>
+        </div>
+        <div class="command-item">
+          <strong>"castle kingside"</strong>
+          <span>Castling</span>

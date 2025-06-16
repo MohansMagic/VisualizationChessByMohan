@@ -22,11 +22,10 @@ export class App implements OnInit, OnDestroy {
   files = ['a','b','c','d','e','f','g','h'];
   ranks = [8,7,6,5,4,3,2,1];
 
-  // Usernames and timers
   whiteName = 'White';
   blackName = 'Black';
-  whiteTime = 5 * 60; // seconds
-  blackTime = 5 * 60; // seconds
+  whiteTime = 5 * 60;
+  blackTime = 5 * 60;
   activeColor: 'w' | 'b' = 'w';
   timerInterval: any = null;
   timeUp: '' | 'w' | 'b' = '';
@@ -34,13 +33,180 @@ export class App implements OnInit, OnDestroy {
   isListening = false;
   recognition: any = null;
 
+  // Enhanced voice features
+  voiceEnabled = false;
+  lastSpokenText = '';
+  synthesis: any = null;
+  voiceRate = 0.8;
+  voicePitch = 1;
+
+  touchStartSquare: string | null = null;
+  recognizedVoiceMove: string = '';
+
+  moveAudio: HTMLAudioElement;
+  captureAudio: HTMLAudioElement;
+  soundReady = false;
+
+  
+  constructor() {
+    this.moveAudio = new Audio('https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_move.wav');
+    this.captureAudio = new Audio('https://upload.wikimedia.org/wikipedia/commons/8/88/Chess_capture.wav');
+    this.moveAudio.load();
+    this.captureAudio.load();
+    
+    // Initialize speech synthesis
+    this.synthesis = window.speechSynthesis;
+  }
+
+  ensureSoundReady() {
+    if (!this.soundReady) {
+      this.moveAudio.load();
+      this.captureAudio.load();
+      this.moveAudio.volume = 0;
+      this.captureAudio.volume = 0;
+      this.moveAudio.play().then(() => this.moveAudio.pause()).catch(()=>{});
+      this.captureAudio.play().then(() => this.captureAudio.pause()).catch(()=>{});
+      this.moveAudio.volume = 1;
+      this.captureAudio.volume = 1;
+      this.soundReady = true;
+    }
+  }
+
   ngOnInit() {
     this.startTimer();
+    this.speak('Welcome to Blindfold Chess. White to move. Click voice mode to enable announcements.');
   }
 
   ngOnDestroy() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.recognition) this.recognition.abort();
+    if (this.synthesis) this.synthesis.cancel();
+  }
+
+  // Voice functionality
+  toggleVoiceMode() {
+    this.voiceEnabled = !this.voiceEnabled;
+    if (this.voiceEnabled) {
+      this.speak('Voice mode enabled. I will announce moves and board status.');
+    } else {
+      this.speak('Voice mode disabled.');
+      if (this.synthesis) this.synthesis.cancel();
+    }
+  }
+
+  speak(text: string) {
+    if (this.synthesis && this.voiceEnabled) {
+      this.synthesis.cancel(); // Cancel any ongoing speech
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = this.voiceRate;
+      utterance.pitch = this.voicePitch;
+      utterance.volume = 1;
+      this.synthesis.speak(utterance);
+      this.lastSpokenText = text;
+    }
+  }
+
+  repeatLastMessage() {
+    if (this.lastSpokenText && this.voiceEnabled) {
+      this.speak(this.lastSpokenText);
+    } else if (!this.voiceEnabled) {
+      this.speak('Voice mode is disabled. Please enable voice mode first.');
+    } else {
+      this.speak('No previous message to repeat.');
+    }
+  }
+
+  announceBoard() {
+    if (!this.voiceEnabled) {
+      this.speak('Voice mode is disabled. Enabling voice mode to announce board.');
+      this.voiceEnabled = true;
+    }
+    
+    let announcement = 'Current board position: ';
+    const board = this.board;
+    
+    // Announce pieces by rank, starting from rank 8
+    for (let rank = 8; rank >= 1; rank--) {
+      const rankIndex = 8 - rank;
+      let rankPieces = [];
+      
+      for (let file = 0; file < 8; file++) {
+        const piece = board[rankIndex][file];
+        if (piece) {
+          const color = piece.charAt(0) === 'w' ? 'White' : 'Black';
+          const pieceType = this.getPieceNameFromSymbol(piece.charAt(1));
+          const square = this.files[file] + rank;
+          rankPieces.push(`${color} ${pieceType} on ${square}`);
+        }
+      }
+      
+      if (rankPieces.length > 0) {
+        announcement += `Rank ${rank}: ${rankPieces.join(', ')}. `;
+      }
+    }
+    
+    // Add game status
+    if (this.chess.isCheck()) {
+      announcement += ` ${this.chess.turn() === 'w' ? 'White' : 'Black'} is in check. `;
+    }
+    
+    if (this.chess.isCheckmate()) {
+      announcement += ` Checkmate! ${this.chess.turn() === 'w' ? 'Black' : 'White'} wins! `;
+    } else if (this.chess.isDraw()) {
+      announcement += ' The game is a draw. ';
+    } else {
+      announcement += ` ${this.chess.turn() === 'w' ? 'White' : 'Black'} to move. `;
+    }
+    
+    this.speak(announcement);
+  }
+
+  getPieceNameFromSymbol(symbol: string): string {
+    const names: Record<string, string> = {
+      'K': 'King',
+      'Q': 'Queen',
+      'R': 'Rook',
+      'B': 'Bishop',
+      'N': 'Knight',
+      'P': 'Pawn'
+    };
+    return names[symbol.toUpperCase()] || 'Unknown';
+  }
+
+  announceMove(moveResult: Move) {
+    if (!this.voiceEnabled) return;
+    
+    let announcement = '';
+    const color = moveResult.color === 'w' ? 'White' : 'Black';
+    const piece = this.getPieceNameFromSymbol(moveResult.piece);
+    
+    if (moveResult.san.includes('O-O-O')) {
+      announcement = `${color} castles queenside`;
+    } else if (moveResult.san.includes('O-O')) {
+      announcement = `${color} castles kingside`;
+    } else {
+      announcement = `${color} ${piece} `;
+      
+      if (moveResult.captured) {
+        const capturedPiece = this.getPieceNameFromSymbol(moveResult.captured);
+        announcement += `captures ${capturedPiece} on ${moveResult.to}`;
+      } else {
+        announcement += `to ${moveResult.to}`;
+      }
+    }
+    
+    // Add special annotations
+    if (moveResult.san.includes('+')) {
+      announcement += ', check';
+    }
+    if (moveResult.san.includes('#')) {
+      announcement += ', checkmate';
+    }
+    if (moveResult.san.includes('=')) {
+      announcement += ', promotes to Queen';
+    }
+    
+    this.speak(announcement);
   }
 
   get board(): Piece[][] {
@@ -82,8 +248,37 @@ export class App implements OnInit, OnDestroy {
     return typeof square === 'string' && /^[a-h][1-8]$/.test(square);
   }
 
+  playSound(type: 'move' | 'capture') {
+    this.ensureSoundReady();
+    let audio = type === 'capture' ? this.captureAudio : this.moveAudio;
+    try {
+      audio.currentTime = 0;
+      setTimeout(() => {
+        audio.play().catch(()=>{});
+      }, 0);
+    } catch(e) {}
+  }
+
+  onTouchStart(row: number, col: number, event: TouchEvent) {
+    this.touchStartSquare = this.getSquareName(row, col);
+    event.preventDefault();
+  }
+
+  onTouchEnd(row: number, col: number, event: TouchEvent) {
+    const endSquare = this.getSquareName(row, col);
+    if (this.touchStartSquare && this.touchStartSquare !== endSquare) {
+      this.selectedSquare = this.touchStartSquare;
+      this.onSquareClick(row, col);
+    } else {
+      this.onSquareClick(row, col);
+    }
+    this.touchStartSquare = null;
+    event.preventDefault();
+  }
+
   onSquareClick(row: number, col: number) {
     if (this.timeUp) return;
+    this.ensureSoundReady();
     const square = this.getSquareName(row, col);
 
     if (!this.selectedSquare) {
@@ -92,6 +287,18 @@ export class App implements OnInit, OnDestroy {
         if (piece && piece.color === this.chess.turn()) {
           this.selectedSquare = square;
           this.moveError = '';
+          
+          // Announce piece selection
+          if (this.voiceEnabled) {
+            const color = piece.color === 'w' ? 'White' : 'Black';
+            const pieceType = this.getPieceNameFromSymbol(piece.type);
+            this.speak(`Selected ${color} ${pieceType} on ${square}`);
+          }
+        } else {
+          this.moveError = 'Select your own piece!';
+          if (this.voiceEnabled) {
+            this.speak('Select your own piece!');
+          }
         }
       }
       return;
@@ -99,12 +306,30 @@ export class App implements OnInit, OnDestroy {
 
     if (this.selectedSquare === square) {
       this.selectedSquare = null;
+      if (this.voiceEnabled) {
+        this.speak('Selection cleared');
+      }
       return;
     }
 
     if (!this.isValidSquare(this.selectedSquare) || !this.isValidSquare(square)) {
       this.moveError = 'Invalid square!';
       this.selectedSquare = null;
+      if (this.voiceEnabled) {
+        this.speak('Invalid square!');
+      }
+      return;
+    }
+
+    const legalMoves = this.chess.moves({ square: this.selectedSquare as Square, verbose: true });
+    const isLegal = legalMoves.some(m => m.to === square);
+
+    if (!isLegal) {
+      this.moveError = 'Illegal move!';
+      this.selectedSquare = null;
+      if (this.voiceEnabled) {
+        this.speak('Illegal move!');
+      }
       return;
     }
 
@@ -112,11 +337,7 @@ export class App implements OnInit, OnDestroy {
 
     if (!moveResult) {
       const piece = this.chess.get(this.selectedSquare as Square);
-      if (
-        piece &&
-        piece.type === 'p' &&
-        (square[1] === '8' || square[1] === '1')
-      ) {
+      if (piece && piece.type === 'p' && (square[1] === '8' || square[1] === '1')) {
         moveResult = this.chess.move({
           from: this.selectedSquare as Square,
           to: square as Square,
@@ -126,30 +347,75 @@ export class App implements OnInit, OnDestroy {
     }
 
     if (moveResult) {
+      this.playSound(moveResult.captured ? 'capture' : 'move');
       this.moveError = '';
+      this.announceMove(moveResult);
       this.switchTimer();
+      
+      // Check for game end conditions
+      setTimeout(() => {
+        if (this.chess.isCheckmate()) {
+          const winner = this.chess.turn() === 'w' ? 'Black' : 'White';
+          this.speak(`Checkmate! ${winner} wins the game!`);
+        } else if (this.chess.isDraw()) {
+          this.speak('The game is a draw!');
+        } else if (this.chess.isCheck()) {
+          const inCheck = this.chess.turn() === 'w' ? 'White' : 'Black';
+          this.speak(`${inCheck} is in check!`);
+        }
+      }, 1000);
     } else {
       this.moveError = 'Invalid move!';
+      if (this.voiceEnabled) {
+        this.speak('Invalid move!');
+      }
     }
     this.selectedSquare = null;
+    setTimeout(() => { this.recognizedVoiceMove = ''; }, 4000);
   }
 
   movePiece(move: string) {
     if (this.timeUp) return;
+    this.ensureSoundReady();
     this.moveError = '';
     move = move.trim();
     if (!move) return;
+
     let result = this.chess.move(move);
-    if (!result && /^[a-h][1-8][a-h][1-8]$/.test(move)) {
-      result = this.chess.move({ from: move.slice(0,2) as Square, to: move.slice(2,4) as Square });
+
+    if (!result && /^[a-h][1-8][a-h][1-8][qrbn]?$/i.test(move)) {
+      const from = move.slice(0,2);
+      const to = move.slice(2,4);
+      const promotion = move.length === 5 ? move[4].toLowerCase() : undefined;
+      result = this.chess.move({ from: from as Square, to: to as Square, promotion });
     }
+
     if (!result) {
       this.moveError = 'Invalid move! Use e4, Nf3, exd5, or e2e4.';
+      if (this.voiceEnabled) {
+        this.speak('Invalid move! Please try again.');
+      }
     } else {
+      this.playSound(result.captured ? 'capture' : 'move');
+      this.announceMove(result);
       this.switchTimer();
+      
+      // Check for game end conditions
+      setTimeout(() => {
+        if (this.chess.isCheckmate()) {
+          const winner = this.chess.turn() === 'w' ? 'Black' : 'White';
+          this.speak(`Checkmate! ${winner} wins the game!`);
+        } else if (this.chess.isDraw()) {
+          this.speak('The game is a draw!');
+        } else if (this.chess.isCheck()) {
+          const inCheck = this.chess.turn() === 'w' ? 'White' : 'Black';
+          this.speak(`${inCheck} is in check!`);
+        }
+      }, 1000);
     }
     this.moveInput = '';
     this.selectedSquare = null;
+    setTimeout(() => { this.recognizedVoiceMove = ''; }, 4000);
   }
 
   get fen(): string {
@@ -174,9 +440,11 @@ export class App implements OnInit, OnDestroy {
     this.activeColor = 'w';
     this.timeUp = '';
     this.startTimer();
+    if (this.voiceEnabled) {
+      this.speak('Game reset. White to move.');
+    }
   }
 
-  // --- Timer Logic ---
   startTimer() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.timerInterval = setInterval(() => {
@@ -184,12 +452,22 @@ export class App implements OnInit, OnDestroy {
       if (this.activeColor === 'w') {
         if (this.whiteTime > 0) {
           this.whiteTime--;
-          if (this.whiteTime === 0) this.timeUp = 'w';
+          if (this.whiteTime === 0) {
+            this.timeUp = 'w';
+            if (this.voiceEnabled) {
+              this.speak('White time is up! Black wins on time.');
+            }
+          }
         }
       } else {
         if (this.blackTime > 0) {
           this.blackTime--;
-          if (this.blackTime === 0) this.timeUp = 'b';
+          if (this.blackTime === 0) {
+            this.timeUp = 'b';
+            if (this.voiceEnabled) {
+              this.speak('Black time is up! White wins on time.');
+            }
+          }
         }
       }
     }, 1000);
@@ -206,12 +484,15 @@ export class App implements OnInit, OnDestroy {
     return `${m}:${s}`;
   }
 
-  // --- Voice Recognition Methods ---
   startListening() {
     if (this.timeUp) return;
+    this.ensureSoundReady();
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
       this.moveError = 'Speech recognition not supported in this browser.';
+      if (this.voiceEnabled) {
+        this.speak('Speech recognition not supported in this browser.');
+      }
       return;
     }
 
@@ -232,6 +513,9 @@ export class App implements OnInit, OnDestroy {
     this.recognition.onerror = (event: any) => {
       this.isListening = false;
       this.moveError = 'Voice recognition error: ' + event.error;
+      if (this.voiceEnabled) {
+        this.speak('Voice recognition error. Please try again.');
+      }
     };
 
     this.recognition.onend = () => {
@@ -240,7 +524,81 @@ export class App implements OnInit, OnDestroy {
   }
 
   handleVoiceMove(transcript: string) {
-    let move = transcript.replace(/\s+/g, '').toLowerCase();
+    console.log('Voice command:', transcript);
+    
+    // Check for special commands
+    if (transcript.toLowerCase().includes('repeat')) {
+      this.repeatLastMessage();
+      return;
+    }
+    
+    if (transcript.toLowerCase().includes('board') || transcript.toLowerCase().includes('position')) {
+      this.announceBoard();
+      return;
+    }
+    
+    if (transcript.toLowerCase().includes('help')) {
+      this.speak('Say moves like "e2 to e4", "knight f3", "bishop takes e5", or "castle kingside". You can also say "repeat" to hear the last message again, or "board" to hear the current position.');
+      return;
+    }
+
+    // Lowercase, remove punctuation, collapse spaces
+    let move = transcript
+      .toLowerCase()
+      .replace(/[.,!?]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Map spoken piece names to letters
+    const pieceMap: Record<string, string> = {
+      'pawn': '',
+      'knight': 'N',
+      'night': 'N', // for misrecognition
+      'bishop': 'B',
+      'rook': 'R',
+      'queen': 'Q',
+      'king': 'K'
+    };
+
+    // Replace "takes", "capture", "captures", "x" with "x"
+    move = move.replace(/\btakes\b|\bcaptures?\b|\bx\b/g, 'x');
+
+    // Handle castling
+    if (move.includes('castle')) {
+      if (move.includes('kingside') || move.includes('king side')) {
+        move = 'O-O';
+      } else if (move.includes('queenside') || move.includes('queen side')) {
+        move = 'O-O-O';
+      }
+    }
+
+    // Handle commands like "queen x d4", "bishop takes e5"
+    for (const [word, letter] of Object.entries(pieceMap)) {
+      // Capture: "queen x d4"
+      move = move.replace(new RegExp(`^${word} x ([a-h][1-8])$`), `${letter}x$1`);
+      // Move: "queen d4"
+      move = move.replace(new RegExp(`^${word} ([a-h][1-8])$`), `${letter}$1`);
+      // Move: "queen to d4"
+      move = move.replace(new RegExp(`^${word} to ([a-h][1-8])$`), `${letter}$1`);
+      // Capture: "queen captures d4"
+      move = move.replace(new RegExp(`^${word} captures? ([a-h][1-8])$`), `${letter}x$1`);
+    }
+
+    // Handle pawn captures: "pawn x d4" → "xd4"
+    move = move.replace(/^pawn x ([a-h][1-8])$/, 'x$1');
+
+    // Remove "to" in "e2 to e4"
+    move = move.replace(/^([a-h][1-8]) to ([a-h][1-8])$/, '$1$2');
+
+    // Remove extra spaces
+    move = move.replace(/\s+/g, '');
+
+    // Capitalize piece letter if present
+    if (/^[nbrqk][a-h][1-8]$/i.test(move) || /^[nbrqk]x[a-h][1-8]$/i.test(move)) {
+      move = move.charAt(0).toUpperCase() + move.slice(1);
+    }
+
+    this.recognizedVoiceMove = move;
     this.moveInput = move;
     this.movePiece(move);
   }
