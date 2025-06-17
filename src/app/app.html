@@ -1,79 +1,8 @@
 <div class="app-root">
   <div class="background-overlay"></div>
   <div class="main-content">
-    
-    <!-- User names and timers -->
-    <div class="timers-row">
-      <div class="timer-block white-block" [class.active]="activeColor === 'w'">
-        <input class="name-input" [(ngModel)]="whiteName" />
-        <div class="timer" [class.timeup]="timeUp==='w'">
-          {{ timeUp === 'w' ? "Time's up!" : formatTime(whiteTime) }}
-        </div>
-      </div>
-      <div class="timer-block black-block" [class.active]="activeColor === 'b'">
-        <input class="name-input" [(ngModel)]="blackName" />
-        <div class="timer" [class.timeup]="timeUp==='b'">
-          {{ timeUp === 'b' ? "Time's up!" : formatTime(blackTime) }}
-        </div>
-      </div>
-    </div>
 
-    <!-- Enhanced Voice Controls -->
-    <div class="voice-controls-section">
-      <div class="voice-main-controls">
-        <button class="voice-toggle-btn" [class.active]="voiceEnabled" (click)="toggleVoiceMode()">
-          <span class="voice-icon">🔊</span>
-          Voice {{ voiceEnabled ? 'ON' : 'OFF' }}
-        </button>
-        
-        <button class="repeat-btn" [disabled]="!voiceEnabled" (click)="repeatLastMessage()">
-          <span class="repeat-icon">🔄</span>
-          Repeat
-        </button>
-        
-        <button class="announce-board-btn" (click)="announceBoard()">
-          <span class="announce-icon">📢</span>
-          Announce Board
-        </button>
-      </div>
-      
-      <div class="voice-feedback" *ngIf="lastSpokenText && voiceEnabled">
-        <span class="last-message">🎙️ Last: "{{ lastSpokenText }}"</span>
-      </div>
-    </div>
-
-    <div class="chessboard-with-ranks">
-      <div class="board-rows">
-        <div class="board-labels-edge board-labels-edge-top">
-          <span class="edge-label" *ngFor="let j of files">{{ j }}</span>
-        </div>
-        <div *ngFor="let row of board; let i = index" class="board-row-with-edge-labels">
-          <span class="edge-label">{{ 8 - i }}</span>
-          <div class="board-row">
-            <div
-              *ngFor="let piece of row; let j = index"
-              class="square"
-              [ngClass]="[
-                (i + j) % 2 === 0 ? 'beige' : 'brown',
-                selectedSquare === getSquareName(i, j) ? 'selected' : ''
-              ]"
-              (click)="onSquareClick(i, j)"
-              (touchstart)="onTouchStart(i, j, $event)"
-              (touchend)="onTouchEnd(i, j, $event)"
-            >
-              <img *ngIf="piece && !blindfold" [src]="getPieceUrl(piece)" />
-              <div class="square-coord" *ngIf="blindfold">{{ getSquareName(i, j) }}</div>
-            </div>
-          </div>
-          <span class="edge-label">{{ 8 - i }}</span>
-        </div>
-        <div class="board-labels-edge board-labels-edge-bottom">
-          <span class="edge-label" *ngFor="let j of files">{{ j }}</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Controls Row -->
+    <!-- Top Controls Row -->
     <div class="controls-row">
       <div class="controls controls-left">
         <button (click)="blindfold = !blindfold">
@@ -82,22 +11,150 @@
         <button (click)="reset()">
           Reset
         </button>
-      </div>
-      <div class="controls controls-right">
-        <button class="speak-move-btn" (click)="startListening()">
-          🎤 Speak Move
+        <button (click)="undoMove()">
+          Undo
         </button>
-        <span *ngIf="isListening" class="listening-indicator">Listening...</span>
-        <input [(ngModel)]="moveInput" placeholder="e4, Nf3, exd5, e2e4, ..." />
-        <button (click)="movePiece(moveInput)">Move</button>
+        <button (click)="flipBoard()">
+          {{ boardFlipped ? 'Unflip Board' : 'Flip Board' }}
+        </button>
+      </div>
+
+      <div class="controls controls-right">
+        <button (click)="toggleVoiceMode()" [ngClass]="{'voice-active': voiceEnabled}">
+          {{ voiceEnabled ? '🔊 Voice On' : '🔇 Voice Off' }}
+        </button>
+        <button (click)="announceMaterial()" [disabled]="!voiceEnabled">
+          Announce Material
+        </button>
+        <button class="announce-board-btn" (click)="announceBoard()" [disabled]="!voiceEnabled">
+          <span class="announce-icon">📢</span>
+          Announce Board
+        </button>
       </div>
     </div>
-    
+
+    <!-- Voice Controls Row (only show when voice is enabled) -->
+    <div class="controls-row" *ngIf="voiceEnabled">
+      <div class="controls controls-left">
+        <button class="speak-move-btn" (click)="startListening()">
+          🎤 {{ isListening ? 'Listening...' : 'Speak Move' }}
+        </button>
+        <span *ngIf="isListening" class="listening-indicator">🎙️ Listening for move...</span>
+      </div>
+
+      <div class="controls controls-right">
+        <button class="repeat-btn" [disabled]="!lastSpokenText" (click)="repeatLastMessage()">
+          <span class="repeat-icon">🔄</span>
+          Repeat Last
+        </button>
+      </div>
+    </div>
+
+    <!-- Voice Feedback -->
+    <div class="voice-feedback" *ngIf="lastSpokenText && voiceEnabled">
+      <span class="last-message">🎙️ Last: "{{ lastSpokenText }}"</span>
+    </div>
+
     <!-- Enhanced Voice Feedback -->
     <div *ngIf="recognizedVoiceMove" class="voice-feedback">
       <span>🎤 Recognized: <b>{{ recognizedVoiceMove }}</b></span>
       <span *ngIf="moveError" class="move-error"> - {{ moveError }}</span>
       <span *ngIf="!moveError" class="move-success"> - Move played!</span>
+    </div>
+
+    <!-- Chess Board with Coordinates -->
+    <div class="chessboard-with-ranks">
+      <div class="board-rows">
+        <!-- Top file labels (a-h) -->
+        <div class="board-labels-edge board-labels-edge-top">
+          <ng-container *ngFor="let file of (boardFlipped ? files.slice().reverse() : files)">
+            <span class="edge-label">{{ file }}</span>
+          </ng-container>
+        </div>
+
+        <!-- Board rows with rank labels (1-8) -->
+        <ng-container *ngFor="let row of (boardFlipped ? board.slice().reverse() : board); let i = index">
+          <div class="board-row-with-edge-labels">
+            <!-- Left rank label -->
+            <span class="edge-label">
+              {{ boardFlipped ? i + 1 : 8 - i }}
+            </span>
+
+            <!-- Board row squares -->
+            <div class="board-row">
+              <ng-container *ngFor="let piece of (boardFlipped ? row.slice().reverse() : row); let j = index">
+                <div
+                  class="square"
+                  [ngClass]="[
+                    (boardFlipped 
+                      ? ((board.length - 1 - i) + (row.length - 1 - j)) % 2 === 0 
+                      : (i + j) % 2 === 0) ? 'beige' : 'brown',
+                    selectedSquare === getSquareName(
+                      boardFlipped ? board.length - 1 - i : i, 
+                      boardFlipped ? row.length - 1 - j : j
+                    ) ? 'selected' : ''
+                  ]"
+                  (click)="onSquareClick(boardFlipped ? board.length - 1 - i : i, boardFlipped ? row.length - 1 - j : j)"
+                  (touchstart)="onTouchStart(boardFlipped ? board.length - 1 - i : i, boardFlipped ? row.length - 1 - j : j, $event)"
+                  (touchend)="onTouchEnd(boardFlipped ? board.length - 1 - i : i, boardFlipped ? row.length - 1 - j : j, $event)"
+                >
+                  <img *ngIf="piece && !blindfold" [src]="getPieceUrl(piece)" [alt]="getPieceNameFromSymbol(piece)" />
+                </div>
+              </ng-container>
+            </div>
+
+            <!-- Right rank label -->
+            <span class="edge-label">
+              {{ boardFlipped ? i + 1 : 8 - i }}
+            </span>
+          </div>
+        </ng-container>
+
+        <!-- Bottom file labels (a-h) -->
+        <div class="board-labels-edge board-labels-edge-bottom">
+          <ng-container *ngFor="let file of (boardFlipped ? files.slice().reverse() : files)">
+            <span class="edge-label">{{ file }}</span>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual Move Input Row -->
+    <div class="controls-row">
+      <div class="controls controls-left">
+        <input [(ngModel)]="moveInput" placeholder="Enter move: e4, Nf3, exd5, e2e4..." class="move-input" autocomplete="off" />
+        <button (click)="movePiece(moveInput)" class="move-button">
+          Make Move
+        </button>
+      </div>
+
+      <div class="controls controls-right">
+        <button (click)="offerDraw()" class="game-action-btn">
+          Offer Draw
+        </button>
+        <button (click)="acceptDraw()" class="game-action-btn">
+          Accept Draw
+        </button>
+        <button (click)="resign()" class="game-action-btn resign-btn">
+          Resign
+        </button>
+      </div>
+    </div>
+
+    <!-- Captured Pieces Display -->
+    <div class="captured-pieces-row">
+      <div class="captured-pieces-white">
+        <b>White captured:</b>
+        <ng-container *ngFor="let p of capturedPieces.b">
+          <span>{{ getPieceNameFromSymbol(p) }}</span>
+        </ng-container>
+      </div>
+      <div class="captured-pieces-black">
+        <b>Black captured:</b>
+        <ng-container *ngFor="let p of capturedPieces.w">
+          <span>{{ getPieceNameFromSymbol(p) }}</span>
+        </ng-container>
+      </div>
     </div>
 
     <!-- Voice Commands Help -->
@@ -126,5 +183,13 @@
         </div>
       </div>
     </div>
+
+    <!-- Game Information -->
+    <div class="game-info">
+      <div><b>FEN:</b> <span class="fen-text">{{ fen }}</span></div>
+      <div><b>PGN:</b> <span class="pgn-text">{{ pgn }}</span></div>
+      <div><b>Move History:</b> <span class="move-history-text">{{ moveHistory.join(', ') }}</span></div>
+    </div>
+
   </div>
 </div>

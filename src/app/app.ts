@@ -373,67 +373,70 @@ export class App implements OnInit, OnDestroy {
     setTimeout(() => { this.recognizedVoiceMove = ''; }, 4000);
   }
 
-  movePiece(move: string) {
-    if (this.timeUp) return;
-    this.ensureSoundReady();
-    this.moveError = '';
-    move = move.trim().toLowerCase();
-    if (!move) return;
+movePiece(move: string) {
+  if (this.timeUp) return;
+  this.ensureSoundReady();
+  this.moveError = '';
+  move = move.trim().toLowerCase();
+  if (!move) return;
 
-    let result = this.chess.move(move);
+  let result = null;
 
-    // Try coordinate notation with promotion (e.g., e7e8q)
-    if (!result && /^[a-h][1-8][a-h][1-8][qrbn]?$/.test(move)) {
-      const from = move.slice(0,2);
-      const to = move.slice(2,4);
-      const promotion = move.length === 5 ? move[4] : undefined;
-      result = this.chess.move({ from, to, promotion });
-    }
-
-    // NEW: Try parsing "e7 to e8 queen" or "e7 e8 knight"
-    if (!result) {
-      const promotionMatch = move.match(/([a-h][1-8])\s*(to)?\s*([a-h][1-8])\s*(queen|rook|bishop|knight)?/);
-      if (promotionMatch) {
-        const from = promotionMatch[1];
-        const to = promotionMatch[3];
-        let promotion;
-        switch (promotionMatch[4]) {
-          case 'queen': promotion = 'q'; break;
-          case 'rook': promotion = 'r'; break;
-          case 'bishop': promotion = 'b'; break;
-          case 'knight': promotion = 'n'; break;
-        }
-        result = this.chess.move({ from, to, promotion });
-      }
-    }
-
-    if (!result) {
-      this.moveError = 'Invalid move! Use e4, Nf3, exd5, or e2e4.';
-      if (this.voiceEnabled) {
-        this.speak('Invalid move! Please try again.');
-      }
-    } else {
-      this.playSound(result.captured ? 'capture' : 'move');
-      this.announceMove(result);
-      this.switchTimer();
-      
-      // Check for game end conditions
-      setTimeout(() => {
-        if (this.chess.isCheckmate()) {
-          const winner = this.chess.turn() === 'w' ? 'Black' : 'White';
-          this.speak(`Checkmate! ${winner} wins the game!`);
-        } else if (this.chess.isDraw()) {
-          this.speak('The game is a draw!');
-        } else if (this.chess.isCheck()) {
-          const inCheck = this.chess.turn() === 'w' ? 'White' : 'Black';
-          this.speak(`${inCheck} is in check!`);
-        }
-      }, 1000);
-    }
-    this.moveInput = '';
-    this.selectedSquare = null;
-    setTimeout(() => { this.recognizedVoiceMove = ''; }, 4000);
+  // 1. Try coordinate notation with promotion: e7e8q, e7e8n, etc.
+  if (!result && /^[a-h][1-8][a-h][1-8][qrbn]$/.test(move)) {
+    const from = move.slice(0,2);
+    const to = move.slice(2,4);
+    const promotion = move[4];
+    result = this.chess.move({ from, to, promotion });
   }
+
+  // 2. Try coordinate notation without promotion: e2e4
+  if (!result && /^[a-h][1-8][a-h][1-8]$/.test(move)) {
+    const from = move.slice(0,2);
+    const to = move.slice(2,4);
+    result = this.chess.move({ from, to });
+  }
+
+  // 3. Try algebraic notation (e8=Q, fxe8=N, etc.)
+  if (!result && /^[a-h][18]=[qrbn]$/.test(move)) {
+    result = this.chess.move(move);
+  }
+  if (!result && /^[a-h]x[a-h][18]=[qrbn]$/.test(move)) {
+    result = this.chess.move(move);
+  }
+
+  // 4. Try standard algebraic: e4, Nf3, exd5, O-O, O-O-O, etc.
+  if (!result) {
+    result = this.chess.move(move);
+  }
+
+  if (!result) {
+    this.moveError = 'Invalid move! Use e4, Nf3, exd5, e2e4, or promotion like e7e8q.';
+    if (this.voiceEnabled) {
+      this.speak('Invalid move! Please try again.');
+    }
+  } else {
+    this.playSound(result.captured ? 'capture' : 'move');
+    this.announceMove(result);
+    this.switchTimer();
+    setTimeout(() => {
+      if (this.chess.isCheckmate()) {
+        const winner = this.chess.turn() === 'w' ? 'Black' : 'White';
+        this.speak(`Checkmate! ${winner} wins the game!`);
+      } else if (this.chess.isDraw()) {
+        this.speak('The game is a draw!');
+      } else if (this.chess.isCheck()) {
+        const inCheck = this.chess.turn() === 'w' ? 'White' : 'Black';
+        this.speak(`${inCheck} is in check!`);
+      }
+    }, 1000);
+  }
+  this.moveInput = '';
+  this.selectedSquare = null;
+  setTimeout(() => { this.recognizedVoiceMove = ''; }, 4000);
+}
+
+
 
   get fen(): string {
     return this.chess.fen();
@@ -553,4 +556,104 @@ export class App implements OnInit, OnDestroy {
 
     this.recognition.start();
   }
+// Feature: Undo last move
+undoMove() {
+  if (this.chess.history().length === 0) {
+    this.moveError = 'No moves to undo!';
+    if (this.voiceEnabled) this.speak('No moves to undo!');
+    return;
+  }
+  this.chess.undo();
+  this.selectedSquare = null;
+  this.moveError = '';
+  this.activeColor = this.chess.turn();
+  this.startTimer();
+  if (this.voiceEnabled) {
+    this.speak(`${this.activeColor === 'w' ? 'White' : 'Black'} to move after undo.`);
+  }
+}
+
+// Feature: Offer draw
+offerDraw() {
+  if (this.voiceEnabled) {
+    this.speak('Draw offered. If your opponent accepts, the game will be a draw.');
+  }
+  this.moveError = 'Draw offered. (This is a local game; accept by clicking "Accept Draw")';
+}
+
+// Feature: Accept draw
+acceptDraw() {
+  this.timeUp = '';
+  this.moveError = 'Draw accepted. The game is a draw!';
+  if (this.voiceEnabled) {
+    this.speak('Draw accepted. The game is a draw!');
+  }
+  if (this.timerInterval) clearInterval(this.timerInterval);
+}
+
+// Feature: Resign
+resign() {
+  if (this.timeUp) return;
+  const loser = this.activeColor === 'w' ? 'White' : 'Black';
+  const winner = this.activeColor === 'w' ? 'Black' : 'White';
+  this.timeUp = this.activeColor;
+  this.moveError = `${loser} resigns. ${winner} wins!`;
+  if (this.voiceEnabled) {
+    this.speak(`${loser} resigns. ${winner} wins!`);
+  }
+  if (this.timerInterval) clearInterval(this.timerInterval);
+}
+
+// Feature: Show captured pieces
+get capturedPieces(): { w: string[], b: string[] } {
+  const allPieces = {
+    w: ['K','Q','R','R','B','B','N','N','P','P','P','P','P','P','P','P'],
+    b: ['K','Q','R','R','B','B','N','N','P','P','P','P','P','P','P','P']
+  };
+  const board = this.chess.board();
+  for (let row of board) {
+    for (let cell of row) {
+      if (cell) {
+        const idx = allPieces[cell.color].indexOf(cell.type.toUpperCase());
+        if (idx !== -1) allPieces[cell.color].splice(idx, 1);
+      }
+    }
+  }
+  return allPieces;
+}
+
+// Feature: Flip board
+boardFlipped = false;
+flipBoard() {
+  this.boardFlipped = !this.boardFlipped;
+  if (this.voiceEnabled) {
+    this.speak(this.boardFlipped ? 'Board flipped.' : 'Board reset to default orientation.');
+  }
+}
+
+// Feature: Highlight last move
+get lastMoveSquares(): string[] {
+  const history = this.chess.history({ verbose: true });
+  if (history.length === 0) return [];
+  const last = history[history.length - 1];
+  return [last.from, last.to];
+}
+
+// Feature: Announce material balance
+announceMaterial() {
+  const pieceValues: Record<string, number> = { Q: 9, R: 5, B: 3, N: 3, P: 1 };
+  let white = 0, black = 0;
+  for (let row of this.chess.board()) {
+    for (let cell of row) {
+      if (cell && cell.type !== 'k') {
+        const val = pieceValues[cell.type.toUpperCase()] || 0;
+        if (cell.color === 'w') white += val;
+        else black += val;
+      }
+    }
+  }
+  let msg = `Material: White has ${white} points, Black has ${black} points.`;
+  if (this.voiceEnabled) this.speak(msg);
+  this.moveError = msg;
+}
 }
