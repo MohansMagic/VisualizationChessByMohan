@@ -26,6 +26,9 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 1.5rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
 
   .timer-block {
     background: #222;
@@ -38,6 +41,7 @@
     align-items: center;
     border: 2px solid transparent;
     transition: border 0.2s;
+    flex: 1 1 45%;
 
     &.active {
       border-color: #ffd700;
@@ -50,6 +54,7 @@
       background: #222;
       color: #fff;
     }
+
     .name-input {
       background: none;
       border: none;
@@ -60,9 +65,11 @@
       margin-bottom: 0.5rem;
       outline: none;
     }
+
     .timer {
       font-size: 1.5rem;
       font-family: 'Roboto Mono', monospace;
+
       &.timeup {
         color: #e74c3c;
         font-weight: bold;
@@ -73,10 +80,13 @@
 
 .voice-controls-section {
   margin-bottom: 1.2rem;
+
   .voice-main-controls {
     display: flex;
     gap: 0.7rem;
     margin-bottom: 0.3rem;
+    flex-wrap: wrap;
+
     button {
       border: none;
       background: #444;
@@ -86,10 +96,12 @@
       font-size: 1rem;
       cursor: pointer;
       transition: background 0.2s;
+
       &.active {
         background: #ffd700;
         color: #222;
       }
+
       &:disabled {
         background: #333;
         color: #aaa;
@@ -97,10 +109,12 @@
       }
     }
   }
+
   .voice-feedback {
     font-size: 0.95rem;
     color: #ffd700;
     margin-top: 0.2rem;
+
     .last-message {
       font-style: italic;
     }
@@ -109,8 +123,29 @@
 
 .chessboard-with-ranks {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
   margin-bottom: 1.2rem;
+  width: 100%;
+  overflow-x: auto;
+
+  .board-labels-edge {
+    display: flex;
+    justify-content: center;
+    width: calc(8 * 12.5vw);
+    max-width: 400px;
+    padding: 0 5px;
+    gap: 2px;
+  }
+
+  .edge-label {
+    color: #aaa;
+    font-size: 0.9rem;
+    width: 12.5vw;
+    max-width: 50px;
+    text-align: center;
+  }
 
   .board-rows {
     display: flex;
@@ -123,43 +158,36 @@
     align-items: center;
   }
 
-  .board-labels-edge {
-    display: flex;
-    width: 100%;
-    justify-content: space-around;
-    padding: 0 20px;
-  }
-
-  .edge-label {
-    color: #aaa;
-    font-size: 0.9rem;
-    width: 20px;
-    text-align: center;
-  }
-
   .board-row {
     display: flex;
+    width: calc(8 * 12.5vw);
+    max-width: 400px;
+    justify-content: center;
   }
 
   .square {
-    width: 50px;
-    height: 50px;
+    width: 12.5vw;
+    height: 12.5vw;
+    max-width: 50px;
+    max-height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
     cursor: pointer;
-    
+
     &.beige {
       background-color: #f0d9b5;
     }
+
     &.brown {
       background-color: #b58863;
     }
+
     &.selected {
       box-shadow: inset 0 0 0 4px rgba(255, 215, 0, 0.8);
     }
-    
+
     img {
       width: 85%;
       height: 85%;
@@ -180,11 +208,14 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 1rem;
-  
+  flex-wrap: wrap;
+  gap: 1rem;
+
   .controls {
     display: flex;
     gap: 0.5rem;
-    
+    flex-wrap: wrap;
+
     button {
       background: #444;
       color: #fff;
@@ -194,19 +225,20 @@
       cursor: pointer;
       font-size: 1rem;
       transition: background 0.2s;
-      
+
       &:hover {
         background: #555;
       }
-      
+
       &.speak-move-btn {
         background: #2980b9;
+
         &:hover {
           background: #3498db;
         }
       }
     }
-    
+
     input {
       padding: 0.5rem;
       border-radius: 6px;
@@ -216,11 +248,17 @@
       font-size: 1rem;
       min-width: 120px;
       outline: none;
-      
+
       &:focus {
         border-color: #3498db;
       }
     }
+  }
+
+  .controls-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 }
 
@@ -230,11 +268,11 @@
   background: #333;
   border-radius: 6px;
   font-size: 0.95rem;
-  
+
   .move-error {
     color: #e74c3c;
   }
-  
+
   .move-success {
     color: #2ecc71;
   }
@@ -251,27 +289,27 @@
   padding: 1rem;
   background: #333;
   border-radius: 8px;
-  
+
   h3 {
     margin-top: 0;
     margin-bottom: 0.8rem;
     color: #3498db;
   }
-  
+
   .command-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 1rem;
-    
+
     .command-item {
       display: flex;
       flex-direction: column;
-      
+
       strong {
         color: #f39c12;
         margin-bottom: 0.2rem;
       }
-      
+
       span {
         font-size: 0.9rem;
         color: #bbb;
@@ -292,35 +330,23 @@
     padding: 1rem 0.2rem 2rem 0.2rem;
   }
 
-  .chessboard-with-ranks {
+  .timers-row {
     flex-direction: column;
     align-items: center;
-    margin-bottom: 1.2rem;
 
-    .board-rows {
-      align-items: center;
-    }
-
-    .board-labels-edge {
-      padding: 0 5px;
-    }
-
-    .square {
-      width: 40px;
-      height: 40px;
+    .timer-block {
+      width: 100%;
+      max-width: 320px;
     }
   }
 
   .controls-row {
     flex-direction: column;
     gap: 1rem;
-    align-items: stretch;
 
     .controls {
       width: 100%;
       flex-direction: column;
-      gap: 0.5rem;
-
       button,
       input {
         width: 100%;
@@ -329,34 +355,25 @@
     }
 
     .controls-right {
-      display: grid;
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-
-      .speak-move-btn {
-        grid-column: 1;
-      }
-
-      input {
-        grid-column: 1 / span 2;
-        grid-row: 2;
-      }
-
-      button:last-child {
-        grid-column: 3;
-        grid-row: 2;
-      }
-
-      .listening-indicator {
-        grid-column: 2 / span 2;
-        grid-row: 1;
-      }
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
     }
   }
 
-  .voice-controls-section .voice-main-controls {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem;
+  .chessboard-with-ranks {
+    .square {
+      width: 11vw;
+      height: 11vw;
+    }
+
+    .edge-label {
+      width: 11vw;
+    }
+
+    .board-labels-edge,
+    .board-row {
+      width: calc(8 * 11vw);
+    }
   }
 }
